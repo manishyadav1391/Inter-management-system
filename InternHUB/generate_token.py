@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SECRET = os.getenv("JWT_SECRET", "a9a5bacd60ccc5c1ee2f070c50004f724e8d25f0ad568e0740a9f9ea9beb881c")
+SECRET = os.getenv("JWT_SECRET", "bwdsHvPG2/f4CDvqNk6hev/4hnXHlx+PNPhBQvtpETw=")
 ALGO   = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Correct claims for InternHub AI Assistant
