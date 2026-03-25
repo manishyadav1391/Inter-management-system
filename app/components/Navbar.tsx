@@ -18,7 +18,7 @@ const navLinks = {
   ],
   department: [
     { href: "/dashboard/department", label: "Overview" },
-    { href: "/dashboard/department/interns", label: "Interns" },
+   
   ],
   intern: [
     { href: "/dashboard/intern", label: "My Profile" },
