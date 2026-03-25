@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
+import Navbar from "@/app/components/Navbar"; 
 
 export default async function DashboardLayout({
   children,
@@ -14,6 +15,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* <Navbar role={role} email={session.user?.email ?? ""} /> */}
       <Sidebar role={role} email={session.user?.email ?? ""} />
       <main className="flex-1 overflow-auto p-6">
         {children}
