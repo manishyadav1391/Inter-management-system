@@ -4,11 +4,13 @@ import { useCallback } from "react";
 
 export default function InternFilters({
   departments,
+  institutes, // 🆕 Added institutes prop
 }: {
   departments: { id: string; name: string }[];
+  institutes: { id: string; name: string }[]; // 🆕 Added type definition
 }) {
-  const router     = useRouter();
-  const pathname   = usePathname();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   // Update URL params without full page reload
@@ -56,7 +58,23 @@ export default function InternFilters({
       >
         <option value="">All Departments</option>
         {departments.map((d) => (
-          <option key={d.id} value={d.id}>{d.name}</option>
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </select>
+
+      {/* 🆕 Institute filter */}
+      <select
+        defaultValue={searchParams.get("institute") ?? ""}
+        onChange={(e) => updateFilter("institute", e.target.value)}
+        className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">All Institutes</option>
+        {institutes.map((i) => (
+          <option key={i.id} value={i.id}>
+            {i.name}
+          </option>
         ))}
       </select>
 

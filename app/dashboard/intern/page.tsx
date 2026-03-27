@@ -40,6 +40,7 @@ const data = await hasuraFetch({
   if (!intern) {
     return (
       <div className="flex items-center justify-center h-64">
+        
         <div className="text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl text-gray-400">?</span>
