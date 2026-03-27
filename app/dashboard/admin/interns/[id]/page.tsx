@@ -20,9 +20,9 @@ export default async function EditInternPage({
     query: `
       query GetIntern($id: uuid!) {
         interns_by_pk(id: $id) {
-          id full_name email gender phone
+          id name  gender phone
           department_id institute_id
-          join_date end_date status
+          start_date end_date status_id
         }
         departments { id name }
         institutes  { id name }
