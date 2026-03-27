@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { hasuraFetch } from "@/app/lib/hasura";
@@ -12,21 +13,26 @@ export default async function InternDashboard() {
 
   const hasuraToken = (session as any).hasuraToken;
   const email       = session.user?.email;
-
-  const data = await hasuraFetch({
-    hasuraToken,
-    query: `
-      query {
-        interns {
-          id name gender phone
-          start_date end_date
-          internship_status { status }
-          department        { name   }
-          institute         { name   }
-        }
+  const userId = (session.user as any).id;
+const data = await hasuraFetch({
+  hasuraToken,
+  query: `
+    query ($userId: uuid!) {
+      interns(where: { user_id: { _eq: $userId } }) {
+        id
+        name
+        gender
+        phone
+        start_date
+        end_date
+        internship_status { status }
+        department { name }
+        institute { name }
       }
-    `,
-  });
+    }
+  `,
+  variables: { userId },
+});
 
   const intern = data.interns[0];
 

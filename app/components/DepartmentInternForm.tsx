@@ -47,10 +47,81 @@ const router = useRouter();
   }
 
  async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  setLoading(true);
+ e.preventDefault();
   setError("");
   setSuccess(false);
+
+  // 🔥 VALIDATIONS START
+
+  // Name
+  if (!form.name || form.name.trim().length < 2) {
+    setError("Name must be at least 2 characters");
+    return;
+  }
+
+  // Email (ONLY on create)
+  if (!isEdit) {
+    if (!form.email) {
+      setError("Email is required");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setError("Invalid email format");
+      return;
+    }
+  }
+
+  // Password (ONLY on create)
+  if (!isEdit) {
+    if (!form.password) {
+      setError("Password is required");
+      return;
+    }
+
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(form.password)) {
+      setError(
+        "Password must be at least 8 characters, include 1 uppercase, 1 lowercase, and 1 number"
+      );
+      return;
+    }
+  }
+
+  // Phone
+  if (form.phone && !/^[0-9]{10}$/.test(form.phone)) {
+    setError("Phone must be 10 digits");
+    return;
+  }
+
+  // Dates
+  if (form.start_date && form.end_date) {
+    const start = new Date(form.start_date);
+    const end = new Date(form.end_date);
+
+    if (start > end) {
+      setError("End date must be after start date");
+      return;
+    }
+  }
+
+  // Required fields (adjust based on your UI)
+  if (!form.institute_id) {
+    setError("Please select an institute");
+    return;
+  }
+
+  if (!isEdit && !form.department_id) {
+    setError("Please select a department");
+    return;
+  }
+
+  // 🔥 VALIDATIONS END
+
+  setLoading(true);
 
   try {
     if (isEdit) {
@@ -91,8 +162,8 @@ const router = useRouter();
       setSuccess(true);
       
       // Redirect and refresh data for Edit mode
-      router.push("/dashboard/department");
       router.refresh();
+      router.push("/dashboard/department");
 
     } else {
       // 2. Create new intern — server action handles password hashing
@@ -110,8 +181,8 @@ const router = useRouter();
       });
 
       // Redirect and refresh data for Create mode
-      router.push("/dashboard/department");
       router.refresh();
+      router.push("/dashboard/department");
     }
 
   } catch (err: any) {

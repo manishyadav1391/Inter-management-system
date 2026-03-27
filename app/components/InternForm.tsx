@@ -46,9 +46,67 @@
     }
 
     async function handleSubmit(e: React.FormEvent) {
-      e.preventDefault();
-      setLoading(true);
-      setError("");
+    e.preventDefault();
+    setError("");
+
+  // 🔥 VALIDATIONS START
+
+  // Name
+  if (!form.name || form.name.trim().length < 2) {
+    setError("Name must be at least 2 characters");
+    return;
+  }
+
+  // Phone (basic)
+  if (form.phone && !/^[0-9]{10}$/.test(form.phone)) {
+    setError("Phone must be 10 digits");
+    return;
+  }
+
+  // Password (ONLY when creating)
+  if (!isEdit) {
+    if (!form.password) {
+      setError("Password is required");
+      return;
+    }
+
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(form.password)) {
+      setError(
+        "Password must be at least 8 characters, include 1 uppercase, 1 lowercase, and 1 number"
+      );
+      return;
+    }
+  }
+
+  // Dates
+  if (form.start_date && form.end_date) {
+    const start = new Date(form.start_date);
+    const end = new Date(form.end_date);
+
+    if (start > end) {
+      setError("End date must be after start date");
+      return;
+    }
+  }
+
+  // Required selects
+  if (!form.department_id) {
+    setError("Please select a department");
+    return;
+  }
+
+  if (!form.institute_id) {
+    setError("Please select an institute");
+    return;
+  }
+
+  // 🔥 VALIDATIONS END
+
+  setLoading(true);
+
 
       try {
         if (isEdit) {
