@@ -3,8 +3,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createInternDepartmentAction } from "@/app/actions/createInternDepartment";
 
-type Institute = { id: string; name: string };
-type Status    = { id: string; status: string };
+
+
+
+type Institute  =  { id: string; name: string };
+type Status     =  { id: string; status: string };
 
 export default function DepartmentInternForm({
   intern,
@@ -17,9 +20,9 @@ export default function DepartmentInternForm({
   statuses:    Status[];
   hasuraToken: string;
 }) {
-  const router = useRouter();
-  const isEdit = !!intern.id;
 
+  const isEdit = !!intern.id;
+const router = useRouter();
   const [form, setForm] = useState({
     name:          intern.name          ?? "",
     email:         "",
@@ -43,76 +46,81 @@ export default function DepartmentInternForm({
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess(false);
+ async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  setSuccess(false);
 
-    try {
-      if (isEdit) {
-        // Update existing intern — use JWT directly
-        const res = await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
-          method:  "POST",
-          headers: {
-            "Content-Type":  "application/json",
-            "Authorization": `Bearer ${hasuraToken}`,
-          },
-          body: JSON.stringify({
-            query: `
-              mutation UpdateIntern($id: uuid!, $set: interns_set_input!) {
-                update_interns_by_pk(
-                  pk_columns: { id: $id }
-                  _set: $set
-                ) { id }
-              }
-            `,
-            variables: {
-              id: intern.id,
-              set: {
-                name:         form.name         || null,
-                gender:       form.gender       || null,
-                phone:        form.phone        || null,
-                start_date:   form.start_date   || null,
-                end_date:     form.end_date     || null,
-                status_id:    form.status_id    || null,
-                institute_id: form.institute_id || null,
-              },
+  try {
+    if (isEdit) {
+      // 1. Update existing intern — use JWT directly
+      const res = await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${hasuraToken}`,
+        },
+        body: JSON.stringify({
+          query: `
+            mutation UpdateIntern($id: uuid!, $set: interns_set_input!) {
+              update_interns_by_pk(
+                pk_columns: { id: $id }
+                _set: $set
+              ) { id }
+            }
+          `,
+          variables: {
+            id: intern.id, // Ensure this matches your data type (uuid)
+            set: {
+              name:         form.name         || null,
+              gender:       form.gender       || null,
+              phone:        form.phone        || null,
+              start_date:   form.start_date   || null,
+              end_date:     form.end_date     || null,
+              status_id:    form.status_id    || null,
+              institute_id: form.institute_id || null,
             },
-          }),
-        });
+          },
+        }),
+      });
 
-        const json = await res.json();
-        if (json.errors) throw new Error(json.errors[0].message);
+      const json = await res.json();
+      if (json.errors) throw new Error(json.errors[0].message);
 
-        setSuccess(true);
-        router.refresh();
+      setSuccess(true);
+      
+      // Redirect and refresh data for Edit mode
+      router.push("/dashboard/department");
+      router.refresh();
 
-      } else {
-        // Create new intern — server action handles password hashing
-        await createInternDepartmentAction({
-          name:          form.name,
-          email:         form.email,
-          password:      form.password,
-          gender:        form.gender,
-          phone:         form.phone,
-          start_date:    form.start_date,
-          end_date:      form.end_date,
-          status_id:     form.status_id,
-          institute_id:  form.institute_id,
-          department_id: form.department_id,
-        });
+    } else {
+      // 2. Create new intern — server action handles password hashing
+      await createInternDepartmentAction({
+        name:          form.name,
+        email:         form.email,
+        password:      form.password,
+        gender:        form.gender,
+        phone:         form.phone,
+        start_date:    form.start_date,
+        end_date:      form.end_date,
+        status_id:     form.status_id,
+        institute_id:  form.institute_id,
+        department_id: form.department_id,
+      });
 
-        router.push("/dashboard/department");
-        router.refresh();
-      }
-
-    } catch (err: any) {
-      setError(err.message ?? "Something went wrong");
-    } finally {
-      setLoading(false);
+      // Redirect and refresh data for Create mode
+      router.push("/dashboard/department");
+      router.refresh();
     }
+
+  } catch (err: any) {
+    // Catching both fetch errors and server action errors
+    setError(err.message ?? "Something went wrong");
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <form

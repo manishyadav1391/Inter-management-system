@@ -292,7 +292,7 @@ export default async function InternsPage({
   if (search) {
     andConditions.push({
       _or: [
-        { full_name: { _ilike: `%${search}%` } },
+        { name: { _ilike: `%${search}%` } },
         { user: { email: { _ilike: `%${search}%` } } }, // nested email
       ],
     });
