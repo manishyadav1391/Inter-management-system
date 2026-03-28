@@ -48,3 +48,4 @@ InternHUB/test_out.txt
 InternHUB/ipconfig.txt
 InternHUB/seed_dummy.py
 InternHUB/chroma_db/
+docker-compose.yml
