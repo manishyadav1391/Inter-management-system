@@ -16,20 +16,23 @@ export default async function DepartmentsPage() {
         departments(order_by: { name: asc }) {
           id
           name
-         head_id
-      head {
-        id
-        email
-      }
+          head_id
           interns_aggregate {
             aggregate { count }
           }
+        }
+        users(order_by: { email: asc }) {
+          id
+          email
         }
       }
     `,
   });
 
   const departments = data.departments;
+  const usersById = new Map<string, { id: string; email: string }>(
+    (data.users ?? []).map((user: { id: string; email: string }) => [user.id, user])
+  );
 
   return (
     <div>
@@ -66,7 +69,7 @@ export default async function DepartmentsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {departments.map((dept: any) => (
-            <DepartmentCard key={dept.id} dept={dept} />
+            <DepartmentCard key={dept.id} dept={dept} usersById={usersById} />
           ))}
         </div>
       )}
@@ -74,8 +77,15 @@ export default async function DepartmentsPage() {
   );
 }
 
-function DepartmentCard({ dept }: { dept: any }) {
+function DepartmentCard({
+  dept,
+  usersById,
+}: {
+  dept: any;
+  usersById: Map<string, { id: string; email: string }>;
+}) {
   const internCount = dept.interns_aggregate?.aggregate?.count ?? 0;
+  const headEmail = dept.head_id ? usersById.get(dept.head_id)?.email : null;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-300 transition">
@@ -83,9 +93,9 @@ function DepartmentCard({ dept }: { dept: any }) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="font-semibold text-gray-800 text-lg">{dept.name}</h2>
-          {dept.head_id ? (
+          {headEmail ? (
             <p className="text-xs text-gray-500 mt-1">
-              Head: {dept.head.email}
+              Head: {headEmail}
             </p>
           ) : (
             <p className="text-xs text-amber-500 mt-1">

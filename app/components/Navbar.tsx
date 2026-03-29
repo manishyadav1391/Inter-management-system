@@ -15,9 +15,12 @@ const navLinks = {
     { href: "/dashboard/admin", label: "Overview" },
     { href: "/dashboard/admin/interns", label: "Interns" },
     { href: "/dashboard/admin/departments", label: "Departments" },
+    { href: "/dashboard/admin/institutes", label: "Institutes" },
+    { href: "/dashboard/admin/chatbot", label: "Chatbot" },
   ],
   department: [
     { href: "/dashboard/department", label: "Overview" },
+    { href: "/dashboard/department/chatbot", label: "Chatbot" },
    
   ],
   intern: [
@@ -62,7 +65,7 @@ export default function Navbar({ role, email }: Props) {
 
         {/* Right: User + Logout */}
         <div className="flex items-center gap-4">
-          <p className="text-xs text-gray-500 truncate max-w-[120px]">
+          <p className="text-xs text-gray-500 truncate max-w-30">
             {email}
           </p>
 

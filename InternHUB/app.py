@@ -10,6 +10,7 @@ This allows any user to access the chatbot and run SQL queries.
 import os
 import logging
 import pandas as pd
+import re
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict, Any
 
@@ -38,6 +39,28 @@ ALLOWED_ORIGINS = [
 # ── Models ─────────────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
     question: str
+
+
+SQL_START_PATTERN = re.compile(
+    r"^\s*(select|with|insert|update|delete|create|alter|drop|truncate)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_sql(text: str) -> bool:
+    if not text or not isinstance(text, str):
+        return False
+    return SQL_START_PATTERN.search(text.strip()) is not None
+
+
+def _generate_sql_for_question(question: str) -> str:
+    """Generate SQL with data-awareness enabled when supported by Vanna."""
+    try:
+        # Some Vanna versions support this flag; it helps resolve value-based prompts.
+        return vn.generate_sql(question=question, allow_llm_to_see_data=True)
+    except TypeError:
+        # Fallback for versions that do not accept allow_llm_to_see_data.
+        return vn.generate_sql(question=question)
 
 # ── Lifespan ───────────────────────────────────────────────────────────
 @asynccontextmanager
@@ -80,8 +103,20 @@ async def health():
 async def generate_sql(payload: ChatRequest):
     """Generate SQL from natural language (Auth Disabled)."""
     try:
-        sql = vn.generate_sql(question=payload.question)
+        sql = _generate_sql_for_question(payload.question)
+
+        if not _looks_like_sql(sql):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "LLM returned non-SQL output. Rephrase your question with explicit SQL intent "
+                    "or retrain the agent with more examples."
+                ),
+            )
+
         return {"sql": sql}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"SQL generation failed: {e}")
         raise HTTPException(500, f"Error generating SQL: {str(e)}")
@@ -110,7 +145,17 @@ async def run_sql(payload: Dict[str, str]):
 async def ask(payload: ChatRequest):
     """Full natural language query lifecycle (Auth Disabled)."""
     try:
-        sql = vn.generate_sql(question=payload.question)
+        sql = _generate_sql_for_question(payload.question)
+
+        if not _looks_like_sql(sql):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "LLM returned non-SQL output. Rephrase the prompt as a query request "
+                    "(example: 'show interns from CHARUSAT with department')."
+                ),
+            )
+
         df = vn.run_sql(sql)
         
         results = []
@@ -125,6 +170,8 @@ async def ask(payload: ChatRequest):
             "results": results,
             "columns": columns
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ask query failed: {e}")
         raise HTTPException(500, f"Error processing query: {str(e)}")

@@ -14,9 +14,12 @@ const navLinks = {
     { href: "/dashboard/admin",          label: "Overview"    },
     { href: "/dashboard/admin/interns",  label: "Interns"     },
     { href: "/dashboard/admin/departments", label: "Departments" },
+    { href: "/dashboard/admin/institutes", label: "Institutes" },
+    { href: "/dashboard/admin/chatbot", label: "Chatbot" },
   ],
   department: [
     { href: "/dashboard/department",         label: "Overview" },
+    { href: "/dashboard/department/chatbot", label: "Chatbot" },
     // { href: "/dashboard/department/interns", label: "Interns"  },
   ],
   intern: [
