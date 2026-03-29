@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: ims-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: ims_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ims_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hasura:
+    image: hasura/graphql-engine:v2.36.1
+    container_name: ims-hasura
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - hasura.env
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgresql://postgres:yourpassword@postgres:5432/ims_db
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
