@@ -9,5 +9,7 @@ export default async function AdminChatbotPage() {
   const role = (session.user as any).role;
   if (role !== "admin") redirect("/dashboard/department");
 
-  return <ChatbotWorkspace />;
+  const hasuraToken = (session as any).hasuraToken;
+
+  return <ChatbotWorkspace bearerToken={hasuraToken} />;
 }

@@ -29,7 +29,11 @@ const SUGGESTED_QUESTIONS = [
   "Show pending interns grouped by institute.",
 ];
 
-export default function ChatbotWorkspace() {
+export default function ChatbotWorkspace({
+  bearerToken,
+}: {
+  bearerToken: string;
+}) {
   const apiBase =
     process.env.NEXT_PUBLIC_CHATBOT_API_BASE ?? "http://localhost:8000/api/v0";
 
@@ -65,6 +69,7 @@ export default function ChatbotWorkspace() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${bearerToken}`,
         },
         body: JSON.stringify({ question: trimmed }),
       });

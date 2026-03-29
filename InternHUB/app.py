@@ -14,7 +14,8 @@ import re
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Request, HTTPException, status
+import jwt
+from fastapi import FastAPI, Request, HTTPException, status, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -45,6 +46,7 @@ SQL_START_PATTERN = re.compile(
     r"^\s*(select|with|insert|update|delete|create|alter|drop|truncate)\b",
     re.IGNORECASE,
 )
+INTERNS_TABLE_PATTERN = re.compile(r"\b(?:public\.)?interns\b", re.IGNORECASE)
 
 
 def _looks_like_sql(text: str) -> bool:
@@ -61,6 +63,54 @@ def _generate_sql_for_question(question: str) -> str:
     except TypeError:
         # Fallback for versions that do not accept allow_llm_to_see_data.
         return vn.generate_sql(question=question)
+
+
+def _parse_auth_claims(authorization: str | None) -> Dict[str, Any]:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+    jwt_secret = os.getenv("JWT_SECRET")
+    if not jwt_secret:
+        raise HTTPException(status_code=500, detail="JWT_SECRET is not configured")
+
+    try:
+        decoded = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+
+    claims = decoded.get("https://hasura.io/jwt/claims", {})
+    if not isinstance(claims, dict):
+        raise HTTPException(status_code=401, detail="Invalid Hasura claims in token")
+
+    return claims
+
+
+def _scope_sql_for_department(sql: str, department_id: str) -> str:
+    if not department_id:
+        raise HTTPException(status_code=403, detail="Department claim missing in token")
+
+    if not INTERNS_TABLE_PATTERN.search(sql):
+        raise HTTPException(
+            status_code=403,
+            detail="Department users can only run queries that include interns data",
+        )
+
+    scoped_sql = INTERNS_TABLE_PATTERN.sub("allowed_interns", sql)
+    cte = (
+        "allowed_interns AS ("
+        "SELECT * FROM interns "
+        f"WHERE department_id = '{department_id}'::uuid AND deleted_at IS NULL"
+        ")"
+    )
+
+    if re.match(r"^\s*with\b", scoped_sql, flags=re.IGNORECASE):
+        return re.sub(r"^\s*with\b", f"WITH {cte},", scoped_sql, count=1, flags=re.IGNORECASE)
+
+    return f"WITH {cte} {scoped_sql}"
 
 # ── Lifespan ───────────────────────────────────────────────────────────
 @asynccontextmanager
@@ -122,11 +172,18 @@ async def generate_sql(payload: ChatRequest):
         raise HTTPException(500, f"Error generating SQL: {str(e)}")
 
 @app.post("/api/v0/run_sql")
-async def run_sql(payload: Dict[str, str]):
+async def run_sql(payload: Dict[str, str], authorization: str | None = Header(default=None)):
     """Execute raw SQL result (Auth Disabled)."""
     sql = payload.get("sql")
     if not sql:
         raise HTTPException(400, "SQL missing")
+
+    claims = _parse_auth_claims(authorization)
+    role = claims.get("x-hasura-default-role")
+    department_id = claims.get("x-hasura-department-id", "")
+
+    if role == "department":
+        sql = _scope_sql_for_department(sql, department_id)
     
     try:
         df = vn.run_sql(sql)
@@ -142,9 +199,13 @@ async def run_sql(payload: Dict[str, str]):
         raise HTTPException(500, f"Database error: {str(e)}")
 
 @app.post("/api/v0/ask")
-async def ask(payload: ChatRequest):
+async def ask(payload: ChatRequest, authorization: str | None = Header(default=None)):
     """Full natural language query lifecycle (Auth Disabled)."""
     try:
+        claims = _parse_auth_claims(authorization)
+        role = claims.get("x-hasura-default-role")
+        department_id = claims.get("x-hasura-department-id", "")
+
         sql = _generate_sql_for_question(payload.question)
 
         if not _looks_like_sql(sql):
@@ -155,6 +216,9 @@ async def ask(payload: ChatRequest):
                     "(example: 'show interns from CHARUSAT with department')."
                 ),
             )
+
+        if role == "department":
+            sql = _scope_sql_for_department(sql, department_id)
 
         df = vn.run_sql(sql)
         
