@@ -2,6 +2,8 @@
 
 import Chart from "chart.js/auto";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { addMessage, clearDraft, setDraft } from "@/app/store/chatSlice";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
 
 type ResultRow = Record<string, unknown>;
 
@@ -22,31 +24,24 @@ type ChatEntry = {
   error?: boolean;
 };
 
-const SUGGESTED_QUESTIONS = [
-  "Show all active interns with department and institute.",
-  "How many interns are in each department?",
-  "List interns whose internship ends in the next 30 days.",
-  "Show pending interns grouped by institute.",
-];
-
 export default function ChatbotWorkspace({
   bearerToken,
+  chatScope,
 }: {
   bearerToken: string;
+  chatScope: string;
 }) {
   const apiBase =
     process.env.NEXT_PUBLIC_CHATBOT_API_BASE ?? "http://localhost:8000/api/v0";
 
-  const [question, setQuestion] = useState("");
+  const dispatch = useAppDispatch();
+  const chatSession = useAppSelector(
+    (state) => state.chat.sessions[chatScope] ?? { draft: "", messages: [] }
+  );
+
+  const question = chatSession.draft;
+  const messages = chatSession.messages;
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatEntry[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text:
-        "Ask me anything about interns, departments, institutes, and statuses. I will generate SQL and show the matching results.",
-    },
-  ]);
 
   const canSend = useMemo(() => question.trim().length > 0 && !loading, [question, loading]);
 
@@ -60,8 +55,8 @@ export default function ChatbotWorkspace({
       text: trimmed,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setQuestion("");
+    dispatch(addMessage({ scope: chatScope, message: userMessage }));
+    dispatch(clearDraft({ scope: chatScope }));
     setLoading(true);
 
     try {
@@ -81,28 +76,32 @@ export default function ChatbotWorkspace({
 
       const data = (await res.json()) as AskResponse;
 
-      setMessages((prev) => [
-        ...prev,
-        {
+      dispatch(
+        addMessage({
+          scope: chatScope,
+          message: {
           id: `a-${Date.now()}`,
           role: "assistant",
           text: "Here is what I found.",
           sql: data.sql,
           columns: data.columns,
           results: data.results,
-        },
-      ]);
+          },
+        })
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      setMessages((prev) => [
-        ...prev,
-        {
+      dispatch(
+        addMessage({
+          scope: chatScope,
+          message: {
           id: `e-${Date.now()}`,
           role: "assistant",
           text: `I could not complete the request: ${message}`,
           error: true,
-        },
-      ]);
+          },
+        })
+      );
     } finally {
       setLoading(false);
     }
@@ -115,27 +114,6 @@ export default function ChatbotWorkspace({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-800">AI Chatbot</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Natural-language access to internship data from your dashboard.
-        </p>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {SUGGESTED_QUESTIONS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => askChatbot(item)}
-              disabled={loading}
-              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">
           {messages.map((entry) => (
@@ -216,8 +194,10 @@ export default function ChatbotWorkspace({
           <div className="flex gap-2">
             <input
               value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask about interns, departments, statuses, or institutes..."
+              onChange={(e) =>
+                dispatch(setDraft({ scope: chatScope, draft: e.target.value }))
+              }
+              placeholder="Ask a question about internship data available to your account..."
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none ring-blue-500 transition focus:ring-2"
             />
             <button
@@ -238,21 +218,74 @@ function QueryChart({ columns, rows }: { columns: string[]; rows: ResultRow[] })
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
 
-  const numericCols = useMemo(() => {
-    return columns.filter((col) => {
-      return (
-        rows.length > 0 &&
-        !Number.isNaN(Number.parseFloat(String(rows[0][col]))) &&
-        Number.isFinite(Number(rows[0][col]))
-      );
+  function asNumber(value: unknown): number | null {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function isNumericColumn(col: string): boolean {
+    if (rows.length === 0) return false;
+    const sample = rows.slice(0, Math.min(rows.length, 20));
+    return sample.every((r) => asNumber(r[col]) !== null);
+  }
+
+  function isLikelyYearColumn(col: string): boolean {
+    const lower = col.toLowerCase();
+    if (lower.includes("year")) return true;
+
+    const sample = rows.slice(0, Math.min(rows.length, 20));
+    if (sample.length === 0) return false;
+
+    return sample.every((r) => {
+      const n = asNumber(r[col]);
+      return n !== null && Number.isInteger(n) && n >= 1900 && n <= 2100;
     });
+  }
+
+  function isLikelyDimensionColumn(col: string): boolean {
+    const lower = col.toLowerCase();
+    const nameBasedDimension =
+      lower.includes("name") ||
+      lower.includes("status") ||
+      lower.includes("department") ||
+      lower.includes("institute") ||
+      lower.includes("category") ||
+      lower.includes("type") ||
+      lower.includes("month") ||
+      lower.includes("date") ||
+      lower.includes("year");
+
+    if (nameBasedDimension) return true;
+
+    // Numeric dimensions like start_year should be used as labels, not metrics.
+    return isLikelyYearColumn(col);
+  }
+
+  const numericCols = useMemo(() => {
+    return columns.filter((col) => isNumericColumn(col));
   }, [columns, rows]);
 
   const labelCol = useMemo(() => {
-    return columns.find((col) => !numericCols.includes(col)) || columns[0];
-  }, [columns, numericCols]);
+    // Prefer explicit dimension columns first.
+    const explicitDimension = columns.find((col) => isLikelyDimensionColumn(col));
+    if (explicitDimension) return explicitDimension;
 
-  const canRenderChart = numericCols.length > 0 && rows.length >= 2;
+    // Next, prefer first non-numeric column.
+    const nonNumeric = columns.find((col) => !numericCols.includes(col));
+    if (nonNumeric) return nonNumeric;
+
+    // Finally, if all columns are numeric, prefer year-like numeric column as labels.
+    const yearNumeric = columns.find((col) => isLikelyYearColumn(col));
+    if (yearNumeric) return yearNumeric;
+
+    return columns[0];
+  }, [columns, numericCols, rows]);
+
+  const metricCols = useMemo(() => {
+    return numericCols.filter((col) => col !== labelCol).slice(0, 2);
+  }, [numericCols, labelCol]);
+
+  const canRenderChart = metricCols.length > 0 && rows.length >= 2;
 
   useEffect(() => {
     if (!canRenderChart || !canvasRef.current) {
@@ -271,9 +304,9 @@ function QueryChart({ columns, rows }: { columns: string[]; rows: ResultRow[] })
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
-    const datasets = numericCols.map((col, idx) => ({
+    const datasets = metricCols.map((col, idx) => ({
       label: col.replace(/_/g, " "),
-      data: rows.map((r) => r[col] as number | string),
+      data: rows.map((r) => Number(r[col] ?? 0)),
       backgroundColor: idx === 0 ? "rgba(99, 102, 241, 0.5)" : "rgba(139, 92, 246, 0.5)",
       borderColor: idx === 0 ? "#6366f1" : "#8b5cf6",
       borderWidth: 2,
@@ -291,6 +324,7 @@ function QueryChart({ columns, rows }: { columns: string[]; rows: ResultRow[] })
         maintainAspectRatio: false,
         plugins: {
           legend: {
+            display: datasets.length > 1,
             labels: {
               color: "#64748b",
             },
@@ -316,7 +350,7 @@ function QueryChart({ columns, rows }: { columns: string[]; rows: ResultRow[] })
         chartRef.current = null;
       }
     };
-  }, [canRenderChart, labelCol, numericCols, rows]);
+  }, [canRenderChart, labelCol, metricCols, rows]);
 
   if (!canRenderChart) return null;
 

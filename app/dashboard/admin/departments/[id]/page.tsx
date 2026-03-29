@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { hasuraFetch } from "@/app/lib/hasura";
 import DepartmentForm from "@/app/components/DepartmentForm";
+import DeleteDepartmentButton from "@/app/components/DeleteDepartmentButton";
 
 export default async function EditDepartmentPage({
   params,
@@ -18,7 +19,13 @@ export default async function EditDepartmentPage({
     hasuraToken,
     query: `
       query GetDepartment($id: uuid!) {
-        departments_by_pk(id: $id) {
+        departments(
+          where: {
+            id: { _eq: $id }
+            deleted_at: { _is_null: true }
+          }
+          limit: 1
+        ) {
           id
           name
           head_id
@@ -35,20 +42,25 @@ export default async function EditDepartmentPage({
     variables: { id },
   });
 
-  if (!data.departments_by_pk) redirect("/dashboard/admin/departments");
+  const department = data.departments?.[0] ?? null;
+
+  if (!department) redirect("/dashboard/admin/departments");
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          {data.departments_by_pk.name}
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Edit department details and assign a head
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {department.name}
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Edit department details and assign a head
+          </p>
+        </div>
+        <DeleteDepartmentButton id={id} hasuraToken={hasuraToken} />
       </div>
       <DepartmentForm
-        initialData={data.departments_by_pk}
+        initialData={department}
         departmentHeads={data.users}
         hasuraToken={hasuraToken}
       />

@@ -13,11 +13,14 @@ export default async function DepartmentsPage() {
     hasuraToken,
     query: `
       query {
-        departments(order_by: { name: asc }) {
+        departments(
+          where: { deleted_at: { _is_null: true } }
+          order_by: { name: asc }
+        ) {
           id
           name
           head_id
-          interns_aggregate {
+          interns_aggregate(where: { deleted_at: { _is_null: true } }) {
             aggregate { count }
           }
         }
@@ -115,7 +118,7 @@ function DepartmentCard({
           href={`/dashboard/admin/departments/${dept.id}`}
           className="flex-1 text-center text-sm text-blue-600 border border-blue-200 rounded py-1.5 hover:bg-blue-50 transition"
         >
-          Assign Head
+          {headEmail ? "Change Head" : "Assign Head"}
         </Link>
         <Link
           href={`/dashboard/admin/interns?department=${dept.id}`}

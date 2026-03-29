@@ -16,11 +16,14 @@ export default async function InstitutesPage() {
     hasuraToken,
     query: `
       query {
-        institutes(order_by: { name: asc }) {
+        institutes(
+          where: { deleted_at: { _is_null: true } }
+          order_by: { name: asc }
+        ) {
           id
           name
           location
-          interns_aggregate {
+          interns_aggregate(where: { deleted_at: { _is_null: true } }) {
             aggregate { count }
           }
         }

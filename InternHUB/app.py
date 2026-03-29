@@ -112,6 +112,70 @@ def _scope_sql_for_department(sql: str, department_id: str) -> str:
 
     return f"WITH {cte} {scoped_sql}"
 
+
+def _department_name_map() -> Dict[str, str]:
+    try:
+        df = vn.run_sql(
+            """
+            SELECT id::text AS id, name
+            FROM departments
+            WHERE deleted_at IS NULL
+            """
+        )
+    except Exception as e:
+        logger.warning(f"Could not load departments for access checks: {e}")
+        return {}
+
+    if df is None or df.empty:
+        return {}
+
+    result: Dict[str, str] = {}
+    for _, row in df.iterrows():
+        dep_id = str(row.get("id", "")).strip().lower()
+        dep_name = str(row.get("name", "")).strip()
+        if dep_id and dep_name:
+            result[dep_id] = dep_name
+    return result
+
+
+def _mentioned_departments(text: str, department_names: List[str]) -> List[str]:
+    lower_text = text.lower()
+    mentions: List[str] = []
+
+    for name in department_names:
+        pattern = rf"(?<!\w){re.escape(name.lower())}(?!\w)"
+        if re.search(pattern, lower_text):
+            mentions.append(name)
+
+    return mentions
+
+
+def _enforce_department_reference_scope(text: str, department_id: str) -> None:
+    dep_map = _department_name_map()
+    own_name = dep_map.get(department_id.strip().lower())
+
+    if not own_name:
+        raise HTTPException(status_code=403, detail="Your department context is not available")
+
+    all_names = list(dep_map.values())
+    mentions = _mentioned_departments(text, all_names)
+
+    if not mentions:
+        return
+
+    own_lower = own_name.lower()
+    other_mentions = [name for name in mentions if name.lower() != own_lower]
+
+    if other_mentions:
+        requested = ", ".join(sorted(set(other_mentions)))
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "You are asking questions related to another department "
+                f"({requested}). You can only access your own department ({own_name})."
+            ),
+        )
+
 # ── Lifespan ───────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -183,6 +247,7 @@ async def run_sql(payload: Dict[str, str], authorization: str | None = Header(de
     department_id = claims.get("x-hasura-department-id", "")
 
     if role == "department":
+        _enforce_department_reference_scope(sql, department_id)
         sql = _scope_sql_for_department(sql, department_id)
     
     try:
@@ -218,6 +283,8 @@ async def ask(payload: ChatRequest, authorization: str | None = Header(default=N
             )
 
         if role == "department":
+            _enforce_department_reference_scope(payload.question, department_id)
+            _enforce_department_reference_scope(sql, department_id)
             sql = _scope_sql_for_department(sql, department_id)
 
         df = vn.run_sql(sql)

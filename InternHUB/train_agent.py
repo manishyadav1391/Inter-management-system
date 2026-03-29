@@ -9,6 +9,8 @@ Run once after first setup, or whenever the schema changes:
 """
 
 import logging
+import csv
+from pathlib import Path
 from vanna_setup import vn, connect_to_postgres
 
 logging.basicConfig(level=logging.INFO)
@@ -110,138 +112,49 @@ DOCUMENTATION = [
     """
 ]
 
-# ── Golden Queries ────────────────────────────────────────────────────────
-GOLDEN_QUERIES = [
-    {
-        "question": "Show all active interns with their email, department and institute.",
-        "sql": """
-            SELECT
-                i.id,
-                i.name,
-                u.email,
-                d.name   AS department,
-                ins.name AS institute,
-                s.status,
-                i.start_date,
-                i.end_date
-            FROM interns i
-            JOIN users u              ON u.id   = i.user_id
-            LEFT JOIN departments d   ON d.id   = i.department_id
-            LEFT JOIN institutes ins  ON ins.id = i.institute_id
-            LEFT JOIN internship_status s ON s.id = i.status_id
-            WHERE i.deleted_at IS NULL
-              AND s.status = 'active'
-            ORDER BY i.created_at DESC;
-        """
-    },
-    {
-        "question": "Count interns by status.",
-        "sql": """
-            SELECT
-                COALESCE(s.status, 'unknown') AS status,
-                COUNT(*) AS total
-            FROM interns i
-            LEFT JOIN internship_status s ON s.id = i.status_id
-            WHERE i.deleted_at IS NULL
-            GROUP BY COALESCE(s.status, 'unknown')
-            ORDER BY total DESC;
-        """
-    },
-    {
-        "question": "List interns ending in the next 30 days.",
-        "sql": """
-            SELECT
-                i.name,
-                u.email,
-                i.end_date,
-                d.name AS department
-            FROM interns i
-            JOIN users u             ON u.id = i.user_id
-            LEFT JOIN departments d  ON d.id = i.department_id
-            WHERE i.deleted_at IS NULL
-              AND i.end_date IS NOT NULL
-              AND i.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days')
-            ORDER BY i.end_date ASC;
-        """
-    },
-    {
-        "question": "How many interns are there in each department?",
-        "sql": """
-            SELECT
-                d.name AS department,
-                COUNT(i.id) AS intern_count
-            FROM departments d
-            LEFT JOIN interns i ON i.department_id = d.id AND i.deleted_at IS NULL
-            WHERE d.deleted_at IS NULL
-            GROUP BY d.name
-            ORDER BY intern_count DESC;
-        """
-    },
-    {
-        "question": "Show all pending interns.",
-        "sql": """
-            SELECT
-                i.name,
-                u.email,
-                d.name AS department,
-                i.start_date,
-                i.end_date
-            FROM interns i
-            JOIN users u             ON u.id = i.user_id
-            LEFT JOIN departments d  ON d.id = i.department_id
-            JOIN internship_status s ON s.id = i.status_id
-            WHERE i.deleted_at IS NULL
-              AND s.status = 'pending'
-            ORDER BY i.start_date ASC;
-        """
-    },
-    {
-        "question": "List all departments with their head's email.",
-        "sql": """
-            SELECT
-                d.name AS department,
-                u.email AS head_email
-            FROM departments d
-            LEFT JOIN users u ON u.id = d.head_id
-            WHERE d.deleted_at IS NULL
-            ORDER BY d.name;
-        """
-    },
-    {
-        "question": "Which institutes have the most interns?",
-        "sql": """
-            SELECT
-                ins.name AS institute,
-                COUNT(i.id) AS intern_count
-            FROM institutes ins
-            LEFT JOIN interns i ON i.institute_id = ins.id AND i.deleted_at IS NULL
-            WHERE ins.deleted_at IS NULL
-            GROUP BY ins.name
-            ORDER BY intern_count DESC;
-        """
-    },
-    {
-        "question": "Show completed interns with their department.",
-        "sql": """
-            SELECT
-                i.name,
-                u.email,
-                d.name AS department,
-                i.end_date
-            FROM interns i
-            JOIN users u             ON u.id = i.user_id
-            LEFT JOIN departments d  ON d.id = i.department_id
-            JOIN internship_status s ON s.id = i.status_id
-            WHERE i.deleted_at IS NULL
-              AND s.status = 'completed'
-            ORDER BY i.end_date DESC;
-        """
-    }
-]
+CSV_PATH = Path(__file__).with_name("training_queries.csv")
+
+
+def load_queries_from_csv(csv_path: Path) -> list[dict[str, str]]:
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"Training CSV not found at: {csv_path}. "
+            "Create this file with headers: question,sql"
+        )
+
+    queries: list[dict[str, str]] = []
+    with csv_path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        required = {"question", "sql"}
+        fields = set(reader.fieldnames or [])
+        if not required.issubset(fields):
+            raise ValueError(
+                "Training CSV must contain headers: question,sql"
+            )
+
+        for idx, row in enumerate(reader, start=2):
+            question = (row.get("question") or "").strip()
+            sql = (row.get("sql") or "").strip()
+            if not question or not sql:
+                logger.warning(
+                    "Skipping invalid training row %s in %s (empty question/sql)",
+                    idx,
+                    csv_path,
+                )
+                continue
+            queries.append({"question": question, "sql": sql})
+
+    if not queries:
+        raise ValueError(f"No valid training rows found in {csv_path}")
+
+    return queries
 
 
 def run_training():
     logger.info("Starting training of InternHub AI against ims_db (Dockerized Postgres)...")
+    logger.info("Loading training examples from CSV: %s", CSV_PATH)
+    csv_queries = load_queries_from_csv(CSV_PATH)
+    logger.info("Loaded %s training examples from CSV", len(csv_queries))
 
     # 1. DDL
     logger.info("Training on schema DDL...")
@@ -253,13 +166,13 @@ def run_training():
     for doc in DOCUMENTATION:
         vn.train(documentation=doc)
 
-    # 3. Golden Queries
-    logger.info("Training on golden SQL examples...")
-    for query in GOLDEN_QUERIES:
+    # 3. CSV Queries
+    logger.info("Training on CSV SQL examples...")
+    for query in csv_queries:
         vn.train(question=query["question"], sql=query["sql"])
 
     logger.info("Training complete! ChromaDB vector store seeded successfully.")
-    logger.info(f"Total golden queries trained: {len(GOLDEN_QUERIES)}")
+    logger.info("Total CSV queries trained: %s", len(csv_queries))
 
 
 if __name__ == "__main__":

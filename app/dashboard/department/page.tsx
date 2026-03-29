@@ -167,12 +167,15 @@ export default async function DepartmentDashboard() {
     hasuraToken,
     query: `
       query {
-        interns(order_by: { created_at: desc }) {
+        interns(
+          where: { deleted_at: { _is_null: true } }
+          order_by: { created_at: desc }
+        ) {
           id name gender phone start_date end_date
           internship_status { status }
           institute         { name   }
         }
-        interns_aggregate {
+        interns_aggregate(where: { deleted_at: { _is_null: true } }) {
           aggregate { count }
         }
       }
@@ -274,7 +277,7 @@ export default async function DepartmentDashboard() {
                       href={`/dashboard/department/interns/${intern.id}`}
                       className="text-blue-600 hover:underline"
                     >
-                      Edit
+                      View / Edit
                     </Link>
                   </td>
                 </tr>

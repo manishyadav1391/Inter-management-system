@@ -292,6 +292,9 @@ export default async function InternsPage({
   // ✅ Build dynamic where clause (safe)
   const andConditions: any[] = [];
 
+  // Always hide soft-deleted interns from UI listings.
+  andConditions.push({ deleted_at: { _is_null: true } });
+
   if (search) {
     andConditions.push({
       _or: [
@@ -341,12 +344,12 @@ export default async function InternsPage({
             email
           }
         }
-        departments {
+        departments(where: { deleted_at: { _is_null: true } }) {
           id
           name
         }
         # 🆕 Fetch institutes for the filter dropdown
-        institutes {
+        institutes(where: { deleted_at: { _is_null: true } }) {
           id
           name
         }
@@ -444,7 +447,7 @@ export default async function InternsPage({
                         href={`/dashboard/admin/interns/${intern.id}`}
                         className="text-blue-600 hover:underline mr-3"
                       >
-                        Edit
+                        View / Edit
                       </Link>
                     </td>
                   </tr>

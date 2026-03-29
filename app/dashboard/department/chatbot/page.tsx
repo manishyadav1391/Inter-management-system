@@ -11,5 +11,5 @@ export default async function DepartmentChatbotPage() {
 
   const hasuraToken = (session as any).hasuraToken;
 
-  return <ChatbotWorkspace bearerToken={hasuraToken} />;
+  return <ChatbotWorkspace bearerToken={hasuraToken} chatScope="department" />;
 }

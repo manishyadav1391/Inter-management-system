@@ -14,8 +14,8 @@ export default async function NewInternPage() {
   hasuraToken,
   query: `
     query {
-      departments        { id name }
-      institutes         { id name }
+      departments(where: { deleted_at: { _is_null: true } }) { id name }
+      institutes(where: { deleted_at: { _is_null: true } }) { id name }
       internship_status  { id status }
     }
   `,

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { hasuraFetch } from "@/app/lib/hasura";
 import InstituteForm from "@/app/components/InstituteForm";
+import DeleteInstituteButton from "@/app/components/DeleteInstituteButton";
 
 export default async function EditInstitutePage({
   params,
@@ -21,7 +22,13 @@ export default async function EditInstitutePage({
     hasuraToken,
     query: `
       query GetInstitute($id: uuid!) {
-        institutes_by_pk(id: $id) {
+        institutes(
+          where: {
+            id: { _eq: $id }
+            deleted_at: { _is_null: true }
+          }
+          limit: 1
+        ) {
           id
           name
           location
@@ -31,20 +38,25 @@ export default async function EditInstitutePage({
     variables: { id },
   });
 
-  if (!data.institutes_by_pk) redirect("/dashboard/admin/institutes");
+  const institute = data.institutes?.[0] ?? null;
+
+  if (!institute) redirect("/dashboard/admin/institutes");
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          {data.institutes_by_pk.name}
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Edit institute details
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {institute.name}
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Edit institute details
+          </p>
+        </div>
+        <DeleteInstituteButton id={id} hasuraToken={hasuraToken} />
       </div>
       <InstituteForm
-        initialData={data.institutes_by_pk}
+        initialData={institute}
         hasuraToken={hasuraToken}
       />
     </div>

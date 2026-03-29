@@ -19,7 +19,13 @@ export default async function EditInternPage({
   hasuraToken,
   query: `
   query GetIntern($id: uuid!) {
-    interns_by_pk(id: $id) {
+    interns(
+      where: {
+        id: { _eq: $id }
+        deleted_at: { _is_null: true }
+      }
+      limit: 1
+    ) {
       id
       name
       gender
@@ -33,15 +39,17 @@ export default async function EditInternPage({
         email
       }
     }
-    departments { id name }
-    institutes  { id name }
+    departments(where: { deleted_at: { _is_null: true } }) { id name }
+    institutes(where: { deleted_at: { _is_null: true } }) { id name }
     internship_status { id status }   
   }
 `,
   variables: { id },
 });
 
-  if (!data.interns_by_pk) redirect("/dashboard/admin/interns");
+  const intern = data.interns?.[0] ?? null;
+
+  if (!intern) redirect("/dashboard/admin/interns");
 
   return (
     <div>
@@ -54,7 +62,7 @@ export default async function EditInternPage({
         institutes={data.institutes}
          statuses={data.internship_status}
         hasuraToken={hasuraToken}
-        initialData={data.interns_by_pk}  
+        initialData={intern}
 />
     </div>
   );

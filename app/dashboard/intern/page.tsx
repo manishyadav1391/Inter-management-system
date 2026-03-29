@@ -13,12 +13,11 @@ export default async function InternDashboard() {
 
   const hasuraToken = (session as any).hasuraToken;
   const email       = session.user?.email;
-  const userId = (session.user as any).id;
 const data = await hasuraFetch({
   hasuraToken,
   query: `
-    query ($userId: uuid!) {
-      interns(where: { user_id: { _eq: $userId } }) {
+    query {
+      interns(limit: 1) {
         id
         name
         gender
@@ -31,7 +30,6 @@ const data = await hasuraFetch({
       }
     }
   `,
-  variables: { userId },
 });
 
   const intern = data.interns[0];

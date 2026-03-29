@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { hasuraFetch } from "@/app/lib/hasura";
-import Link from "next/link";
+import AdminOverviewCharts from "@/app/components/AdminOverviewCharts";
 
 export default async function AdminDashboard() {
   const session = await auth();
@@ -14,17 +14,24 @@ export default async function AdminDashboard() {
     hasuraToken,
     query: `
       query {
-        interns_aggregate {
+        interns_aggregate(where: { deleted_at: { _is_null: true } }) {
           aggregate { count }
         }
-        departments_aggregate {
+        departments_aggregate(where: { deleted_at: { _is_null: true } }) {
           aggregate { count }
         }
-        institutes_aggregate {
+        institutes_aggregate(where: { deleted_at: { _is_null: true } }) {
           aggregate { count }
+        }
+        interns(where: { deleted_at: { _is_null: true } }) {
+          department { name }
+          internship_status { status }
         }
        active: interns_aggregate(
-  where: { internship_status: { status: { _eq: "active" } } }
+    where: {
+      deleted_at: { _is_null: true }
+      internship_status: { status: { _eq: "active" } }
+    }
 ) {
           aggregate { count }
         }
@@ -36,6 +43,26 @@ export default async function AdminDashboard() {
   const totalDepartments = data.departments_aggregate.aggregate.count;
   const totalInstitutes  = data.institutes_aggregate.aggregate.count;
   const activeInterns    = data.active.aggregate.count;
+
+  const interns = data.interns ?? [];
+
+  const statusMap = new Map<string, number>();
+  const departmentMap = new Map<string, number>();
+
+  for (const intern of interns) {
+    const status = intern.internship_status?.status ?? "unknown";
+    const dept = intern.department?.name ?? "Unassigned";
+
+    statusMap.set(status, (statusMap.get(status) ?? 0) + 1);
+    departmentMap.set(dept, (departmentMap.get(dept) ?? 0) + 1);
+  }
+
+  const statusLabels = Array.from(statusMap.keys());
+  const statusCounts = Array.from(statusMap.values());
+
+  const sortedDepartments = Array.from(departmentMap.entries()).sort((a, b) => b[1] - a[1]);
+  const departmentLabels = sortedDepartments.map(([name]) => name);
+  const departmentCounts = sortedDepartments.map(([, count]) => count);
 
   return (
     <div>
@@ -54,24 +81,12 @@ export default async function AdminDashboard() {
         <StatCard label="Institutes"        value={totalInstitutes}  color="amber"  />
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-800 mb-4">Quick Actions</h2>
-        <div className="flex gap-3">
-          <Link
-            href="/dashboard/admin/interns/new"
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition"
-          >
-            + Add Intern
-          </Link>
-          <Link
-            href="/dashboard/admin/interns"
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50 transition"
-          >
-            View All Interns
-          </Link>
-        </div>
-      </div>
+      <AdminOverviewCharts
+        statusLabels={statusLabels}
+        statusCounts={statusCounts}
+        departmentLabels={departmentLabels}
+        departmentCounts={departmentCounts}
+      />
     </div>
   );
 }

@@ -23,9 +23,16 @@ export default function InternProfileForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setSuccess(false);
     setError("");
+    setSuccess(false);
+
+    const trimmedPhone = form.phone.trim();
+    if (trimmedPhone && !/^\d{10}$/.test(trimmedPhone)) {
+      setError("Phone number must be exactly 10 digits");
+      return;
+    }
+
+    setLoading(true);
 
     const res = await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
       method:  "POST",
@@ -44,7 +51,10 @@ export default function InternProfileForm({
         `,
         variables: {
           id:  intern.id,
-          set: form,
+          set: {
+            ...form,
+            phone: trimmedPhone || null,
+          },
         },
       }),
     });
@@ -96,7 +106,15 @@ export default function InternProfileForm({
         <input
           type="text"
           value={form.phone}
-          onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, "");
+            if (value.length <= 10) {
+              setForm((p) => ({ ...p, phone: value }));
+            }
+          }}
+          inputMode="numeric"
+          maxLength={10}
+          placeholder="10-digit mobile number"
           className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>

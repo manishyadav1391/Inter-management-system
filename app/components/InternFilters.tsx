@@ -33,14 +33,14 @@ export default function InternFilters({
       <input
         type="text"
         placeholder="Search name or email..."
-        defaultValue={searchParams.get("search") ?? ""}
+        value={searchParams.get("search") ?? ""}
         onChange={(e) => updateFilter("search", e.target.value)}
         className="border border-gray-300 rounded px-3 py-2 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
 
       {/* Gender filter */}
       <select
-        defaultValue={searchParams.get("gender") ?? ""}
+        value={searchParams.get("gender") ?? ""}
         onChange={(e) => updateFilter("gender", e.target.value)}
         className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
@@ -52,7 +52,7 @@ export default function InternFilters({
 
       {/* Department filter */}
       <select
-        defaultValue={searchParams.get("department") ?? ""}
+        value={searchParams.get("department") ?? ""}
         onChange={(e) => updateFilter("department", e.target.value)}
         className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
@@ -66,7 +66,7 @@ export default function InternFilters({
 
       {/* 🆕 Institute filter */}
       <select
-        defaultValue={searchParams.get("institute") ?? ""}
+        value={searchParams.get("institute") ?? ""}
         onChange={(e) => updateFilter("institute", e.target.value)}
         className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >

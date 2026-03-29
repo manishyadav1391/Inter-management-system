@@ -11,5 +11,5 @@ export default async function AdminChatbotPage() {
 
   const hasuraToken = (session as any).hasuraToken;
 
-  return <ChatbotWorkspace bearerToken={hasuraToken} />;
+  return <ChatbotWorkspace bearerToken={hasuraToken} chatScope="admin" />;
 }
