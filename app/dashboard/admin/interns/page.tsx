@@ -267,12 +267,13 @@ type SearchParams = {
   search?: string;
   gender?: string;
   department?: string;
+  institute?: string; // 🆕 Added institute filter type
 };
 
 export default async function InternsPage({
   searchParams,
 }: {
- searchParams: Promise<SearchParams>;
+  searchParams: Promise<SearchParams>;
 }) {
   // 🔐 Auth check
   const session = await auth();
@@ -280,20 +281,22 @@ export default async function InternsPage({
 
   const hasuraToken = (session as any).hasuraToken;
 
-   // ✅ IMPORTANT FIX
+  // ✅ IMPORTANT FIX
   const params = await searchParams;
 
   const search = params.search ?? "";
   const gender = params.gender ?? "";
   const deptId = params.department ?? "";
+  const instId = params.institute ?? ""; // 🆕 Extract institute param
+
   // ✅ Build dynamic where clause (safe)
   const andConditions: any[] = [];
 
   if (search) {
     andConditions.push({
       _or: [
-        {name: { _ilike: `%${search}%` } },
-        { user: { email: { _ilike: `%${search}%` } } }, // nested email
+        { name: { _ilike: `%${search}%` } },
+        { user: { email: { _ilike: `%${search}%` } } },
       ],
     });
   }
@@ -304,6 +307,11 @@ export default async function InternsPage({
 
   if (deptId) {
     andConditions.push({ department_id: { _eq: deptId } });
+  }
+
+  // 🆕 Add institute condition
+  if (instId) {
+    andConditions.push({ institute_id: { _eq: instId } });
   }
 
   const where = andConditions.length ? { _and: andConditions } : {};
@@ -337,6 +345,11 @@ export default async function InternsPage({
           id
           name
         }
+        # 🆕 Fetch institutes for the filter dropdown
+        institutes {
+          id
+          name
+        }
       }
     `,
     variables: { where },
@@ -344,6 +357,7 @@ export default async function InternsPage({
 
   const interns = data?.interns ?? [];
   const departments = data?.departments ?? [];
+  const institutes = data?.institutes ?? []; // 🆕
 
   return (
     <div>
@@ -360,14 +374,16 @@ export default async function InternsPage({
       </div>
 
       {/* Filters */}
-      <InternFilters departments={departments} />
+      {/* 🆕 Pass institutes to the filter component */}
+      <InternFilters departments={departments} institutes={institutes} />
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mt-4">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {["Name", "Email", "Department", "Gender", "Status", "Actions"].map((h) => (
+              {/* 🆕 Added "Institute" to headers */}
+              {["Name", "Email", "Department", "Institute", "Gender", "Status", "Actions"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 font-medium text-gray-600">
                   {h}
                 </th>
@@ -378,7 +394,7 @@ export default async function InternsPage({
           <tbody className="divide-y divide-gray-100">
             {interns.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-400">
+                <td colSpan={7} className="text-center py-8 text-gray-400">
                   No interns found
                 </td>
               </tr>
@@ -388,27 +404,27 @@ export default async function InternsPage({
 
                 return (
                   <tr key={intern.id} className="hover:bg-gray-50">
-                    {/* Name */}
                     <td className="px-4 py-3 font-medium text-gray-800">
                       {intern.name}
                     </td>
 
-                    {/* Email */}
                     <td className="px-4 py-3 text-gray-600">
                       {intern.user?.email ?? "—"}
                     </td>
 
-                    {/* Department */}
                     <td className="px-4 py-3 text-gray-600">
                       {intern.department?.name ?? "—"}
                     </td>
 
-                    {/* Gender */}
+                    {/* 🆕 Institute Cell */}
+                    <td className="px-4 py-3 text-gray-600">
+                      {intern.institute?.name ?? "—"}
+                    </td>
+
                     <td className="px-4 py-3 text-gray-600 capitalize">
                       {intern.gender ?? "—"}
                     </td>
 
-                    {/* Status */}
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -423,7 +439,6 @@ export default async function InternsPage({
                       </span>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/admin/interns/${intern.id}`}

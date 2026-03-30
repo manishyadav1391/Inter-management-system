@@ -327,13 +327,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createInternDepartmentAction } from "@/app/actions/createInternDepartment";
- 
- 
- 
- 
+
+
+
+
 type Institute  =  { id: string; name: string };
 type Status     =  { id: string; status: string };
- 
+
 export default function DepartmentInternForm({
   intern,
   institutes,
@@ -345,7 +345,7 @@ export default function DepartmentInternForm({
   statuses:    Status[];
   hasuraToken: string;
 }) {
- 
+
   const isEdit = !!intern.id;
 const router = useRouter();
   const [form, setForm] = useState({
@@ -370,13 +370,84 @@ const router = useRouter();
   ) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
- 
+
  async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  setLoading(true);
+ e.preventDefault();
   setError("");
   setSuccess(false);
- 
+
+  // 🔥 VALIDATIONS START
+
+  // Name
+  if (!form.name || form.name.trim().length < 2) {
+    setError("Name must be at least 2 characters");
+    return;
+  }
+
+  // Email (ONLY on create)
+  if (!isEdit) {
+    if (!form.email) {
+      setError("Email is required");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setError("Invalid email format");
+      return;
+    }
+  }
+
+  // Password (ONLY on create)
+  if (!isEdit) {
+    if (!form.password) {
+      setError("Password is required");
+      return;
+    }
+
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(form.password)) {
+      setError(
+        "Password must be at least 8 characters, include 1 uppercase, 1 lowercase, and 1 number"
+      );
+      return;
+    }
+  }
+
+  // Phone
+  if (form.phone && !/^[0-9]{10}$/.test(form.phone)) {
+    setError("Phone must be 10 digits");
+    return;
+  }
+
+  // Dates
+  if (form.start_date && form.end_date) {
+    const start = new Date(form.start_date);
+    const end = new Date(form.end_date);
+
+    if (start > end) {
+      setError("End date must be after start date");
+      return;
+    }
+  }
+
+  // Required fields (adjust based on your UI)
+  if (!form.institute_id) {
+    setError("Please select an institute");
+    return;
+  }
+
+  if (!isEdit && !form.department_id) {
+    setError("Please select a department");
+    return;
+  }
+
+  // 🔥 VALIDATIONS END
+
+  setLoading(true);
+
   try {
     if (isEdit) {
       // 1. Update existing intern — use JWT directly
@@ -409,16 +480,16 @@ const router = useRouter();
           },
         }),
       });
- 
+
       const json = await res.json();
       if (json.errors) throw new Error(json.errors[0].message);
- 
+
       setSuccess(true);
-     
+      
       // Redirect and refresh data for Edit mode
       router.refresh();
       router.push("/dashboard/department");
- 
+
     } else {
       // 2. Create new intern — server action handles password hashing
       await createInternDepartmentAction({
@@ -433,12 +504,12 @@ const router = useRouter();
         institute_id:  form.institute_id,
         department_id: form.department_id,
       });
- 
+
       // Redirect and refresh data for Create mode
       router.refresh();
       router.push("/dashboard/department");
     }
- 
+
   } catch (err: any) {
     // Catching both fetch errors and server action errors
     setError(err.message ?? "Something went wrong");
@@ -446,7 +517,7 @@ const router = useRouter();
     setLoading(false);
   }
 }
- 
+
   return (
     <form
       onSubmit={handleSubmit}
