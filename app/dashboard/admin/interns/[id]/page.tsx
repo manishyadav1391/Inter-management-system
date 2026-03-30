@@ -26,6 +26,7 @@ export default async function EditInternPage({
         }
         departments { id name }
         institutes  { id name }
+        internship_status { id status }
       }
     `,
     variables: { id },
@@ -42,6 +43,7 @@ export default async function EditInternPage({
       <InternForm
         departments={data.departments}
         institutes={data.institutes}
+        statuses={data.internship_status}
         hasuraToken={hasuraToken}
         initialData={data.interns_by_pk}
       />
