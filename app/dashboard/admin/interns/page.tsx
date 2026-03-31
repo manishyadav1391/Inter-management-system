@@ -262,12 +262,15 @@ import { redirect } from "next/navigation";
 import { hasuraFetch } from "@/app/lib/hasura";
 import Link from "next/link";
 import InternFilters from "@/app/components/InternFilters";
+import PaginationControls from "@/app/components/PaginationControls";
 
 type SearchParams = {
   search?: string;
   gender?: string;
   department?: string;
-  institute?: string; // 🆕 Added institute filter type
+  institute?: string;
+  page?: string;
+  limit?: string;
 };
 
 export default async function InternsPage({
@@ -281,13 +284,16 @@ export default async function InternsPage({
 
   const hasuraToken = (session as any).hasuraToken;
 
-  // ✅ IMPORTANT FIX
+  // ✅ Extract pagination params
   const params = await searchParams;
 
   const search = params.search ?? "";
   const gender = params.gender ?? "";
   const deptId = params.department ?? "";
-  const instId = params.institute ?? ""; // 🆕 Extract institute param
+  const instId = params.institute ?? "";
+  const page = Math.max(1, parseInt(params.page ?? "1"));
+  const limit = parseInt(params.limit ?? "10");
+  const offset = (page - 1) * limit;
 
   // ✅ Build dynamic where clause (safe)
   const andConditions: any[] = [];
@@ -312,19 +318,18 @@ export default async function InternsPage({
     andConditions.push({ department_id: { _eq: deptId } });
   }
 
-  // 🆕 Add institute condition
   if (instId) {
     andConditions.push({ institute_id: { _eq: instId } });
   }
 
   const where = andConditions.length ? { _and: andConditions } : {};
 
-  // 📡 Fetch data
+  // 📡 Fetch data with pagination
   const data = await hasuraFetch({
     hasuraToken,
     query: `
-      query GetInterns($where: interns_bool_exp) {
-        interns(where: $where, order_by: { created_at: desc }) {
+      query GetInterns($where: interns_bool_exp, $limit: Int!, $offset: Int!) {
+        interns(where: $where, order_by: { created_at: desc }, limit: $limit, offset: $offset) {
           id
           name
           gender
@@ -344,23 +349,29 @@ export default async function InternsPage({
             email
           }
         }
+        interns_aggregate(where: $where) {
+          aggregate {
+            count
+          }
+        }
         departments(where: { deleted_at: { _is_null: true } }) {
           id
           name
         }
-        # 🆕 Fetch institutes for the filter dropdown
         institutes(where: { deleted_at: { _is_null: true } }) {
           id
           name
         }
       }
     `,
-    variables: { where },
+    variables: { where, limit, offset },
   });
 
   const interns = data?.interns ?? [];
+  const totalRecords = data?.interns_aggregate?.aggregate?.count ?? 0;
+  const totalPages = Math.ceil(totalRecords / limit);
   const departments = data?.departments ?? [];
-  const institutes = data?.institutes ?? []; // 🆕
+  const institutes = data?.institutes ?? [];
 
   return (
     <div>
@@ -457,6 +468,14 @@ export default async function InternsPage({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={page}
+        totalPages={totalPages}
+        limit={limit}
+        totalRecords={totalRecords}
+      />
     </div>
   );
 }
