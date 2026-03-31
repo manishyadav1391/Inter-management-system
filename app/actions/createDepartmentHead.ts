@@ -1,5 +1,6 @@
 "use server";
 import bcrypt from "bcryptjs";
+import { sendCredentialsEmail } from "@/lib/mailer";
 
 export async function createDepartmentHeadAction(formData: {
   email:         string;
@@ -46,6 +47,35 @@ export async function createDepartmentHeadAction(formData: {
   if (data.errors) throw new Error(data.errors[0].message);
 
   const userId = data.data.insert_users_one.id;
+
+  try {
+    // Send credentials before assigning head to avoid inconsistent assignment.
+    await sendCredentialsEmail({
+      to: formData.email,
+      password: formData.password,
+      role: "department",
+    });
+  } catch (emailError: any) {
+    await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
+      method:  "POST",
+      headers: {
+        "Content-Type":          "application/json",
+        "x-hasura-admin-secret": process.env.HASURA_ADMIN_SECRET!,
+      },
+      body: JSON.stringify({
+        query: `
+          mutation RollbackDepartmentHead($id: uuid!) {
+            delete_users_by_pk(id: $id) { id }
+          }
+        `,
+        variables: { id: userId },
+      }),
+    });
+
+    throw new Error(
+      `Department head was not created because credential email could not be sent: ${emailError?.message ?? "Unknown email error"}`
+    );
+  }
 
   // 3. Set head_id on the department
   const deptRes = await fetch(

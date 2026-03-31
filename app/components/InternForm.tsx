@@ -270,7 +270,7 @@
         {!isEdit && (
           <p className="text-xs text-gray-500 mt-3">
             The intern will use this email and password to log in.
-            Share the temporary password with them securely.
+            Credentials are automatically sent to the intern email address.
           </p>
         )}
 

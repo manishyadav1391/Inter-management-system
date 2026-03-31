@@ -1,5 +1,6 @@
 "use server";
 import bcrypt from "bcryptjs";
+import { sendCredentialsEmail } from "@/lib/mailer";
 
 export async function createInternAction(formData: {
   name:          string;
@@ -91,6 +92,35 @@ export async function createInternAction(formData: {
 
   if (internData.errors) {
     throw new Error(internData.errors[0].message);
+  }
+
+  try {
+    await sendCredentialsEmail({
+      to: formData.email,
+      password: formData.password,
+      role: "intern",
+    });
+  } catch (emailError: any) {
+    // Delete user to rollback both user + intern (intern has FK with cascade delete).
+    await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
+      method:  "POST",
+      headers: {
+        "Content-Type":          "application/json",
+        "x-hasura-admin-secret": process.env.HASURA_ADMIN_SECRET!,
+      },
+      body: JSON.stringify({
+        query: `
+          mutation RollbackIntern($id: uuid!) {
+            delete_users_by_pk(id: $id) { id }
+          }
+        `,
+        variables: { id: userId },
+      }),
+    });
+
+    throw new Error(
+      `Intern was not created because credential email could not be sent: ${emailError?.message ?? "Unknown email error"}`
+    );
   }
 
   return internData.data.insert_interns_one;

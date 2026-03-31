@@ -70,7 +70,7 @@ export default function DepartmentForm({
       // Add to local heads list and auto-select
       setHeads((prev) => [...prev, { id: newUser.id, email: newUser.email }]);
       setForm((prev) => ({ ...prev, head_id: newUser.id }));
-      setHeadSuccess(`${newUser.email} created and assigned as head!`);
+      setHeadSuccess(`${newUser.email} created, assigned as head, and credentials emailed.`);
       setHeadForm({ email: "", password: "" });
       setShowCreateHead(false);
       router.refresh();
@@ -298,7 +298,7 @@ export default function DepartmentForm({
           </h3>
           <p className="text-xs text-blue-600 mb-4">
             This will create a login account with role = department,
-            linked to this department automatically.
+            linked to this department automatically, and email the credentials.
           </p>
 
           {headError && (
