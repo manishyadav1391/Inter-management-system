@@ -26,7 +26,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               query: `
                 query GetUser($email: String!) {
                   users(where: { email: { _eq: $email } }) {
-                    id email password role department_id
+                    id email password role department_id must_change_password
                   }
                 }
               `,
@@ -56,6 +56,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email:        user.email,
           role:         user.role,
           departmentId: user.department_id,
+          mustChangePassword: user.must_change_password,
         };
       },
     }),
@@ -67,6 +68,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id           = user.id;
         token.role         = (user as any).role;
         token.departmentId = (user as any).departmentId;
+        token.mustChangePassword = (user as any).mustChangePassword;
       }
       return token;
     },
@@ -75,6 +77,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.id                    = token.id as string;
       (session.user as any).role         = token.role;
       (session.user as any).departmentId = token.departmentId;
+      (session.user as any).mustChangePassword = Boolean(token.mustChangePassword);
 
       // Build Hasura JWT using jose (Edge runtime compatible)
       const secret = new TextEncoder().encode(process.env.JWT_SECRET!);

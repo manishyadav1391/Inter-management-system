@@ -34,6 +34,7 @@ export async function createInternAction(formData: {
               password:      $password
               role:          "intern"
               department_id: $dept
+              must_change_password: true
             }) {
               id
             }

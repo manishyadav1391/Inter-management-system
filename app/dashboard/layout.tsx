@@ -11,6 +11,10 @@ export default async function DashboardLayout({
   const session = await auth();
   if (!session) redirect("/login");
 
+  if ((session.user as any).mustChangePassword) {
+    redirect("/change-password");
+  }
+
   const role = (session.user as any).role;
 
   return (

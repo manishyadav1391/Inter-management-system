@@ -31,6 +31,7 @@ export async function createDepartmentHeadAction(formData: {
               password:      $password
               role:          "department"
               department_id: $deptId
+              must_change_password: true
             }) { id email }
           }
         `,

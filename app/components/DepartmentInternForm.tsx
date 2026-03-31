@@ -330,7 +330,7 @@ const router = useRouter();
       {!isEdit && (
         <p className="text-xs text-gray-500 mt-3 col-span-2">
           The intern will use this email and temporary password to log in.
-          Share the password with them securely after creating the account.
+          Credentials are automatically sent to the intern email address.
         </p>
       )}
 

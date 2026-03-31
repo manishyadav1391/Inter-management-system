@@ -7,6 +7,10 @@ export default async function Home() {
   // Not logged in → go to login
   if (!session) redirect("/login");
 
+  if ((session.user as any).mustChangePassword) {
+    redirect("/change-password");
+  }
+
   // Logged in → go to correct dashboard based on role
   const role = (session.user as any).role;
   if (role === "admin")      redirect("/dashboard/admin");

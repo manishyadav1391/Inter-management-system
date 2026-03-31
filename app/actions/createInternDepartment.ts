@@ -1,5 +1,6 @@
 "use server";
 import bcrypt from "bcryptjs";
+import { sendCredentialsEmail } from "@/lib/mailer";
 
 export async function createInternDepartmentAction(formData: {
   name:          string;
@@ -32,6 +33,7 @@ export async function createInternDepartmentAction(formData: {
               password:      $password
               role:          "intern"
               department_id: $dept
+              must_change_password: true
             }) { id }
           }
         `,
@@ -83,6 +85,34 @@ export async function createInternDepartmentAction(formData: {
 
   const internData = await internRes.json();
   if (internData.errors) throw new Error(internData.errors[0].message);
+
+  try {
+    await sendCredentialsEmail({
+      to: formData.email,
+      password: formData.password,
+      role: "intern",
+    });
+  } catch (emailError: any) {
+    await fetch(process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL!, {
+      method:  "POST",
+      headers: {
+        "Content-Type":          "application/json",
+        "x-hasura-admin-secret": process.env.HASURA_ADMIN_SECRET!,
+      },
+      body: JSON.stringify({
+        query: `
+          mutation RollbackIntern($id: uuid!) {
+            delete_users_by_pk(id: $id) { id }
+          }
+        `,
+        variables: { id: userId },
+      }),
+    });
+
+    throw new Error(
+      `Intern was not created because credential email could not be sent: ${emailError?.message ?? "Unknown email error"}`
+    );
+  }
 
   return internData.data.insert_interns_one;
 }
